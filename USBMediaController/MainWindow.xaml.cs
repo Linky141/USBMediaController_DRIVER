@@ -33,6 +33,13 @@ namespace USBMediaController
     {
         //------------------------------------------------------------------------------------
         #region VARIABLES
+        #region DEV VARIABLES
+        bool devMaximalizeOnStartup = true;
+        #endregion
+        #region CONFIG_VARIABLES
+        int maxItemsInConsole = 100;
+        #endregion
+
 
         Containter_ConnectionInfo connectionInfo = new Containter_ConnectionInfo();
         Container_ControllerConfig controllerConfig = new Container_ControllerConfig();
@@ -54,11 +61,11 @@ namespace USBMediaController
             pbarSendUartData.Visibility = Visibility.Hidden;
 
             if(File.Exists(@"C:\USBMediaControllerv2\icon.ico")) tray_main.Icon = new System.Drawing.Icon(@"C:\USBMediaControllerv2\icon.ico");
-            else ConsoleWrite("#Error Load Icon");
+            else ConsoleWrite("#Error Load Icon", Brushes.Pink);
 
             if (!LoadCommunicationConfig())
             {
-                ConsoleWrite("#Error Load Connection Config");
+                ConsoleWrite("#Error Load Connection Config", Brushes.Pink);
                 ShowSysTrayInfo("USBMediaController", "Error Load Connection Config", BalloonIcon.Error);
             }
             else
@@ -67,19 +74,19 @@ namespace USBMediaController
             }
             if (!LoadControllerConfig())
             {
-                ConsoleWrite("#Error Load Controller Config");
+                ConsoleWrite("#Error Load Controller Config", Brushes.Pink);
                 ShowSysTrayInfo("USBMediaController", "Error Load Controller Config", BalloonIcon.Error);
             }
             if (!LoadControllerCurrentSelected())
             {
-                ConsoleWrite("#Error Load Controller Current Selected Profile Config");
+                ConsoleWrite("#Error Load Controller Current Selected Profile Config", Brushes.Pink);
                 ShowSysTrayInfo("USBMediaController", "Error Load Controller Current Selected Profile Config", BalloonIcon.Error);
             }
             CheckFirstRun();
             SetAllInfoControls();
             InitializeDevice();
             //CenterWindowOnScreen();
-            this.Hide();
+            if(!devMaximalizeOnStartup) this.Hide();
         }
 
         #endregion
@@ -113,7 +120,7 @@ namespace USBMediaController
                 }
                 catch (Exception ex)
                 {
-                    ConsoleWrite("#Failed send: " + data + "(" + ex.Message + ")");
+                    ConsoleWrite($"#Failed send: {data}({ex.Message})", Brushes.Pink);
                 }
             }
             else
@@ -138,8 +145,7 @@ namespace USBMediaController
                 {
                     SendUART(controllerConfig.list[id].getPage1(clk).getDescription(), 1);
                     SendUART("\n", 1);
-                    tbx_console.Dispatcher.Invoke(
-                    () => ConsoleWrite("<--: " + controllerConfig.list[id].getPage1(clk).getDescription()));
+                    lbxConsole.Dispatcher.Invoke(() => ConsoleWrite($"<--: {controllerConfig.list[id].getPage1(clk).getDescription()}", Brushes.LightBlue));
                     Thread.Sleep(200);
                     pbarSendUartData.Dispatcher.Invoke(() => pbarSendUartData.Value++);
                     
@@ -148,8 +154,7 @@ namespace USBMediaController
                 {
                     SendUART(controllerConfig.list[id].getPage2(clk).getDescription(), 1);
                     SendUART("\n", 1);
-                    tbx_console.Dispatcher.Invoke(
-                    () => ConsoleWrite("<--: " + controllerConfig.list[id].getPage2(clk).getDescription()));
+                    lbxConsole.Dispatcher.Invoke(() => ConsoleWrite($"<--: {controllerConfig.list[id].getPage2(clk).getDescription()}", Brushes.LightBlue));
                     Thread.Sleep(200);
                     pbarSendUartData.Dispatcher.Invoke(() => pbarSendUartData.Value++);
                   
@@ -158,7 +163,7 @@ namespace USBMediaController
                 {
                     SendUART(controllerConfig.list[id].getPage3(clk).getDescription(), 1);
                     SendUART("\n", 1);
-                    tbx_console.Dispatcher.Invoke(() => ConsoleWrite("<--: " + controllerConfig.list[id].getPage3(clk).getDescription()));
+                    lbxConsole.Dispatcher.Invoke(() => ConsoleWrite($"<--: {controllerConfig.list[id].getPage3(clk).getDescription()}", Brushes.LightBlue));
                     Thread.Sleep(200);
                     pbarSendUartData.Dispatcher.Invoke(() => pbarSendUartData.Value++);
                   
@@ -167,7 +172,7 @@ namespace USBMediaController
                 {
                     SendUART(controllerConfig.list[id].getPage4(clk).getDescription(), 1);
                     SendUART("\n", 1);
-                    tbx_console.Dispatcher.Invoke(() => ConsoleWrite("<--: " + controllerConfig.list[id].getPage4(clk).getDescription()));
+                    lbxConsole.Dispatcher.Invoke(() => ConsoleWrite($"<--: {controllerConfig.list[id].getPage4(clk).getDescription()}", Brushes.LightBlue));
                     Thread.Sleep(200);
                     pbarSendUartData.Dispatcher.Invoke(() => pbarSendUartData.Value++);
       
@@ -375,18 +380,25 @@ namespace USBMediaController
             if(uartReciverBuffer.Length >4)
             {
                 CheckInputCommand(uartReciverBuffer);
-                ConsoleWrite(uartReciverBuffer);
+                ConsoleWrite(uartReciverBuffer, Brushes.LightYellow);
                 uartReciverBuffer = "";
             }
         }
 
-        private void ConsoleWrite(string val)
+        private void ConsoleWrite(string val, Brush brush = null)
         {
-            tbx_console.Text += val + "\n";
+            ListBoxItem tmpItem = new ListBoxItem();
+            tmpItem.Content = val;
+            if (brush != null)
+                tmpItem.Foreground = brush;
 
+            lbxConsole.Items.Add(tmpItem);
 
-            tbx_console.SelectionStart = tbx_console.Text.Length;
-            tbx_console.ScrollToEnd();
+            if (lbxConsole.Items.Count > maxItemsInConsole)
+                lbxConsole.Items.RemoveAt(0);
+
+            lbxConsole.SelectedIndex = lbxConsole.Items.Count - 1;
+            lbxConsole.ScrollIntoView(lbxConsole.SelectedItem);
         }
 
         #endregion
@@ -598,7 +610,7 @@ namespace USBMediaController
                     {
                         btn_connect.Content = "Connect";
                         ShowSysTrayInfo("USBMediaController", "Disconnected", BalloonIcon.Info);
-                        ConsoleWrite("#Disconnected");
+                        ConsoleWrite("#Disconnected", Brushes.LightGreen);
                     }
                 }
                 else
@@ -608,8 +620,8 @@ namespace USBMediaController
                     {
                         connectionInfo.serial.DataReceived += new System.IO.Ports.SerialDataReceivedEventHandler(Recieve);
                         btn_connect.Content = "Disconnect";
-                        ShowSysTrayInfo("USBMediaController", "Connected at port " + connectionInfo.getPortName(), BalloonIcon.Info);
-                        ConsoleWrite("#Connected at port " + connectionInfo.getPortName());
+                        ShowSysTrayInfo("USBMediaController", $"Connected at port {connectionInfo.getPortName()}", BalloonIcon.Info);
+                        ConsoleWrite($"#Connected at port {connectionInfo.getPortName()}", Brushes.LightGreen);
                     }
                 }
                 SetAllInfoControls();
@@ -617,7 +629,7 @@ namespace USBMediaController
             catch (Exception exception)
             {
                 ShowSysTrayInfo("USBMediaController", exception.Message, BalloonIcon.Error);
-                ConsoleWrite("#ERROR: " + exception.Message);
+                ConsoleWrite($"#ERROR: {exception.Message}", Brushes.Pink);
             }
         }
 
@@ -667,7 +679,7 @@ namespace USBMediaController
 
         private void btn_clearConsole_Click(object sender, RoutedEventArgs e)
         {
-            tbx_console.Clear();
+            lbxConsole.Items.Clear();
         }
 
 
